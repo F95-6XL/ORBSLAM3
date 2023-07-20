@@ -2112,6 +2112,12 @@ void Optimizer::OptimizeEssentialGraph(KeyFrame* pCurKF, vector<KeyFrame*> &vpFi
     }
 }
 
+// 优化目标是g2oS12，即pKF2到pKF1的坐标转换。
+// 只设立一个待优化节点，即相对位姿。并将pFK1->mvpMapPoints和vpMatches1作为固定节点。
+// vpMatches1是尝试将pKF2投影到PKF1并寻找matching的结果。
+
+// 边设立两个方向的，一个是vpMatches1的点投影到pKF1的重投影误差，
+// 另一个是pFK1->mvpMapPoints投影到pKF2的重投影误差。这里确保了vpMatches1有值，即pFK1->mvpMapPoints到pKF2的投影能找到。
 int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &vpMatches1, g2o::Sim3 &g2oS12, const float th2,
                             const bool bFixScale, Eigen::Matrix<double,7,7> &mAcumHessian, const bool bAllPoints)
 {

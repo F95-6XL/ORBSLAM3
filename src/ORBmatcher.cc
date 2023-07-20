@@ -424,6 +424,17 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
+    /*
+     * \brief Project all points from \ref vpPoints onto \ref pKF and search for ORB matching.
+     * \param pKF        The key frame.
+     * \param Scw        The world to camera transformation, relative to the key frame.
+     * \param vpPoints   The points to project.
+     * \param vpMatched  The vector to store the matched points for \ref pKF. Must have same length as pixel count of pKF.
+     * \return           The number of matches.
+     * 
+     * \note Differs from other SearchByProjection function, this function will not write the matching point into pKF->mvpMapPoints.
+     * Instead, it writes them into \ref vpMatched. It serves more like a try-out and count matches.
+     */
     int ORBmatcher::SearchByProjection(KeyFrame* pKF, Sophus::Sim3f &Scw, const vector<MapPoint*> &vpPoints,
                                        vector<MapPoint*> &vpMatched, int th, float ratioHamming)
     {
