@@ -1737,6 +1737,8 @@ void Tracking::PreintegrateIMU()
 
 bool Tracking::PredictStateIMU()
 {
+    // orb中是直接用预积分值去预测当前帧的位姿的
+    // 相比vins省了一些计算量
     if(!mCurrentFrame.mpPrevFrame)
     {
         Verbose::PrintMess("No last frame", Verbose::VERBOSITY_NORMAL);
@@ -2863,10 +2865,11 @@ bool Tracking::TrackWithMotionModel()
     {
         // Predict state with IMU if it is initialized and it doesnt need reset
         PredictStateIMU();
-        return true;
+        return true; // 如果IMU已经初始化且状态好，直接用IMU积分，然后return？？？
     }
     else
     {
+        // 否则，用帧间速度估算位姿，再进行图优化，复杂很多
         mCurrentFrame.SetPose(mVelocity * mLastFrame.GetPose());
     }
 

@@ -738,20 +738,21 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
     {
         unique_lock<mutex> lock(mMutex);
 
+        // 遍历当前帧的BoW，统计当前帧和所有关键帧的共视单词数
         for(DBoW2::BowVector::const_iterator vit=F->mBowVec.begin(), vend=F->mBowVec.end(); vit != vend; vit++)
         {
-            list<KeyFrame*> &lKFs =   mvInvertedFile[vit->first];
+            list<KeyFrame*> &lKFs =   mvInvertedFile[vit->first]; // 也有该BoW单词的关键帧列表
 
             for(list<KeyFrame*>::iterator lit=lKFs.begin(), lend= lKFs.end(); lit!=lend; lit++)
             {
                 KeyFrame* pKFi=*lit;
-                if(pKFi->mnRelocQuery!=F->mnId)
+                if(pKFi->mnRelocQuery!=F->mnId) //同一个关键帧可能在for循环中多次出现。仅在第一次出现时对计数器归零
                 {
-                    pKFi->mnRelocWords=0;
+                    pKFi->mnRelocWords=0; 
                     pKFi->mnRelocQuery=F->mnId;
                     lKFsSharingWords.push_back(pKFi);
                 }
-                pKFi->mnRelocWords++;
+                pKFi->mnRelocWords++; // 计数
             }
         }
     }
@@ -766,7 +767,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
             maxCommonWords=(*lit)->mnRelocWords;
     }
 
-    int minCommonWords = maxCommonWords*0.8f;
+    int minCommonWords = maxCommonWords*0.8f; //统计最大共视次数，取0.8倍为候选关键帧阈值
 
     list<pair<float,KeyFrame*> > lScoreAndMatch;
 
@@ -780,7 +781,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
         if(pKFi->mnRelocWords>minCommonWords)
         {
             nscores++;
-            float si = mpVoc->score(F->mBowVec,pKFi->mBowVec);
+            float si = mpVoc->score(F->mBowVec,pKFi->mBowVec); //对于存在共视且满足共视次数阈值的关键帧，使用BoW计算相似度得分 
             pKFi->mRelocScore=si;
             lScoreAndMatch.push_back(make_pair(si,pKFi));
         }
@@ -793,10 +794,11 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
     float bestAccScore = 0;
 
     // Lets now accumulate score by covisibility
+    // 取每帧的最佳10帧共视帧组成局部邻域组，在组内对相似度得分进行累加
     for(list<pair<float,KeyFrame*> >::iterator it=lScoreAndMatch.begin(), itend=lScoreAndMatch.end(); it!=itend; it++)
     {
         KeyFrame* pKFi = it->second;
-        vector<KeyFrame*> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(10);
+        vector<KeyFrame*> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(10);//找到最佳10帧共视帧
 
         float bestScore = it->first;
         float accScore = bestScore;
@@ -804,10 +806,10 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
         for(vector<KeyFrame*>::iterator vit=vpNeighs.begin(), vend=vpNeighs.end(); vit!=vend; vit++)
         {
             KeyFrame* pKF2 = *vit;
-            if(pKF2->mnRelocQuery!=F->mnId)
+            if(pKF2->mnRelocQuery!=F->mnId)//如果组员完全不存在共视，就直接跳过
                 continue;
 
-            accScore+=pKF2->mRelocScore;
+            accScore+=pKF2->mRelocScore; //累加得分，并记录10帧中共视得分最高的帧作为该组的代表帧
             if(pKF2->mRelocScore>bestScore)
             {
                 pBestKF=pKF2;
@@ -817,18 +819,18 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
         }
         lAccScoreAndMatch.push_back(make_pair(accScore,pBestKF));
         if(accScore>bestAccScore)
-            bestAccScore=accScore;
+            bestAccScore=accScore; //记录所有组的最高累计得分
     }
 
     // Return all those keyframes with a score higher than 0.75*bestScore
-    float minScoreToRetain = 0.75f*bestAccScore;
+    float minScoreToRetain = 0.75f*bestAccScore; //取0.75倍作为是否接受某一组的阈值。
     set<KeyFrame*> spAlreadyAddedKF;
     vector<KeyFrame*> vpRelocCandidates;
     vpRelocCandidates.reserve(lAccScoreAndMatch.size());
     for(list<pair<float,KeyFrame*> >::iterator it=lAccScoreAndMatch.begin(), itend=lAccScoreAndMatch.end(); it!=itend; it++)
     {
         const float &si = it->first;
-        if(si>minScoreToRetain)
+        if(si>minScoreToRetain) //遍历所有组。如组被接受，最终推送组中的最佳候选关键帧进入候选列表
         {
             KeyFrame* pKFi = it->second;
             if (pKFi->GetMap() != pMap)

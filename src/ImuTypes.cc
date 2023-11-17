@@ -176,6 +176,10 @@ void Preintegrated::Reintegrate()
 
 void Preintegrated::IntegrateNewMeasurement(const Eigen::Vector3f &acceleration, const Eigen::Vector3f &angVel, const float &dt)
 {
+    // 本函数中仅进行预积分
+    // 和vins中一样，orb也保存两个预积分vector
+    // 一个是关键帧之间的，一个是所有帧之间的
+
     mvMeasurements.push_back(integrable(acceleration,angVel,dt));
 
     // Position is updated firstly, as it depends on previously computed velocity and rotation.
@@ -196,6 +200,9 @@ void Preintegrated::IntegrateNewMeasurement(const Eigen::Vector3f &acceleration,
     avgW = (dT*avgW + accW*dt)/(dT+dt);
 
     // Update delta position dP and velocity dV (rely on no-updated delta rotation)
+    // 这里的acc是相邻两帧IMU的中值，dR是上一帧IMU位姿到图像位姿的旋转
+    // ORBSLAM这里认为它近似等于两帧IMU中值对应的旋转了
+    // 而Vins里面是先更新了dR，然后各自做了坐标变换的
     dP = dP + dV*dt + 0.5f*dR*acc*dt*dt;
     dV = dV + dR*acc*dt;
 
@@ -210,6 +217,7 @@ void Preintegrated::IntegrateNewMeasurement(const Eigen::Vector3f &acceleration,
 
 
     // Update position and velocity jacobians wrt bias correction
+    // orb中的雅可比矩阵分成小块来存储了
     JPa = JPa + JVa*dt -0.5f*dR*dt*dt;
     JPg = JPg + JVg*dt -0.5f*dR*dt*dt*Wacc*JRg;
     JVa = JVa - dR*dt;
@@ -224,6 +232,7 @@ void Preintegrated::IntegrateNewMeasurement(const Eigen::Vector3f &acceleration,
     B.block<3,3>(0,0) = dRi.rightJ*dt;
 
     // Update covariance
+    // 协方差矩阵维度和vins中相同
     C.block<9,9>(0,0) = A * C.block<9,9>(0,0) * A.transpose() + B*Nga*B.transpose();
     C.block<6,6>(9,9) += NgaWalk;
 

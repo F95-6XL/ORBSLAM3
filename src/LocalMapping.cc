@@ -555,12 +555,14 @@ void LocalMapping::CreateNewMapPoints()
             }
 
             // Check parallax between rays
-            Eigen::Vector3f xn1 = pCamera1->unprojectEig(kp1.pt);
+            Eigen::Vector3f xn1 = pCamera1->unprojectEig(kp1.pt); //将点投影到单位平面上，这里xn1的z坐标为1
             Eigen::Vector3f xn2 = pCamera2->unprojectEig(kp2.pt);
 
-            Eigen::Vector3f ray1 = Rwc1 * xn1;
+            Eigen::Vector3f ray1 = Rwc1 * xn1; //可以把xn1看作从相机光心到地图点的射线，转换到世界坐标系下
             Eigen::Vector3f ray2 = Rwc2 * xn2;
-            const float cosParallaxRays = ray1.dot(ray2)/(ray1.norm() * ray2.norm());
+
+            //对得到的两条射线，比较其平行度。如果太过于平行，没法三角化
+            const float cosParallaxRays = ray1.dot(ray2)/(ray1.norm() * ray2.norm()); 
 
             float cosParallaxStereo = cosParallaxRays+1;
             float cosParallaxStereo1 = cosParallaxStereo;
@@ -582,6 +584,7 @@ void LocalMapping::CreateNewMapPoints()
             if(cosParallaxRays<cosParallaxStereo && cosParallaxRays>0 && (bStereo1 || bStereo2 ||
                                                                           (cosParallaxRays<0.9996 && mbInertial) || (cosParallaxRays<0.9998 && !mbInertial)))
             {
+                // 如果两个射线不是很平行，就可以进行三角化
                 goodProj = GeometricTools::Triangulate(xn1, xn2, eigTcw1, eigTcw2, x3D);
                 if(!goodProj)
                     continue;
@@ -610,7 +613,7 @@ void LocalMapping::CreateNewMapPoints()
                 continue;
 
             //Check triangulation in front of cameras
-            float z1 = Rcw1.row(2).dot(x3D) + tcw1(2);
+            float z1 = Rcw1.row(2).dot(x3D) + tcw1(2); //检测三角化结果是否位于相机前方
             if(z1<=0)
                 continue;
 
